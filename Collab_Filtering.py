@@ -80,6 +80,7 @@ def populaire_producten(sub_cat):
     # SQL query voor naar de database schrijven
     query = "INSERT INTO populaire_producten (productid, category) VALUES %s"
 
+    # Naar Tuple
     to_execute = tuple(to_execute)
 
     psycopg2.extras.execute_values(cursor, query, to_execute)

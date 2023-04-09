@@ -196,6 +196,7 @@ def categorie_aanbeveling(sub_cat):
     # SQL query voor het toevoegen
     query = "INSERT INTO meest_gekocht (profileid, productid, category) VALUES %s"
 
+    # Naar Tuple
     to_execute = tuple(to_execute)
 
     # Print statement voor duidelijkheid
