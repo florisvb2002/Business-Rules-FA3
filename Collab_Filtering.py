@@ -3,6 +3,8 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 import os
 
+load_dotenv()
+
 conn = psycopg2.connect(
     database=os.getenv("postgres_DB"),
     host='localhost',
@@ -14,7 +16,9 @@ conn = psycopg2.connect(
 cursor = conn.cursor()
 
 
-def categorie_aanbeveling(sub_cat):
+
+
+def populaire_producten(sub_cat):
 
     # Hier kijkt of input False of True was waardoor die de categorie of subcategorie ophaald uit de database
 
@@ -66,136 +70,18 @@ def categorie_aanbeveling(sub_cat):
             top_4_products_per_category[categorie].append(product_id)
 
 
-    # Print statement voor duidelijkheid
-    print("Data uit database halen...")
-
-    # Haalt alle profile ids en product ids van de database
-    cursor.execute(f'''SELECT prof.id, ord.productid
-    FROM profile as prof
-    RIGHT JOIN session as ses ON ses.profileid = prof.id AND has_sale = true
-    RIGHT JOIN "order" as ord ON ses.id = ord.sessionid''')
-
-    alle_profile_ids_en_product_ids = cursor.fetchall()
-
-    # Print statement voor duidelijkheid
-    print("Profiel connecten met producten...")
-
-    # Dictionary aanmaken
-    profile_dict = {}
-
-    # In deze for loop kijkt die naar de gekochten per profiel
-    # En voegt die gekochte producten toevoegt aan het profiel
-    for profile, product in tqdm(alle_profile_ids_en_product_ids):
-        if profile in profile_dict:
-            profile_dict[profile].append(product)
-        else:
-            profile_dict[profile] = [product]
-
-    # Hier kijkt of input False of True was waardoor die de categorie of subcategorie ophaald uit de database
-    query = ""
-    if sub_cat:
-        query = '''
-    SELECT id,sub_category
-    FROM product'''
-    else:
-        query ='''
-    SELECT id,category
-    FROM product
-    '''
-    cursor.execute(query)
-
-    aanbeveling = {}
-    print("Aanbevelingen maken voorbereiden...")
-    producten = cursor.fetchall()
-    for product in producten:
-        categorie = None
-        if product[1]:
-            categorie = product[1]
-
-        if categorie and product[0]:
-            categorie = categorie.lower()
-            if categorie not in aanbeveling:
-                aanbeveling[categorie] = []
-            aanbeveling[categorie].append(product[0])
-
-    # Dictionay aanmaken
-    result_dict = {}
-
-    # In deze for loop kijkt die per profiel de gekochte producten in de bijbehorende categorie horen
-    # En daarna voegt hij die toe
-    for profile, products in tqdm(profile_dict.items()):
-        result_dict[profile] = {}
-        for category in aanbeveling:
-            result_dict[profile][category] = []
-            for product_id in products:
-                if str(product_id) in aanbeveling[category]:
-                    result_dict[profile][category].append(product_id)
-
-
-    # Print statement voor duidelijkheid wat er gebeurd
-    print("Aanbevelingen maken...")
-
-    # In deze for loop kijk ik voor elk profiel of er producten zijn gekocht in een categorie en
-    # Als er geen producten in de orders zijn voegt hij producten toe die populair zijn in die categorie
-    for profile in tqdm(result_dict):
-        for category in top_4_products_per_category:
-
-            if category not in result_dict[profile]:
-                result_dict[profile][category] = []
-
-            for product in top_4_products_per_category[category]:
-
-                if len(result_dict[profile][category]) < 4:
-                    result_dict[profile][category].append(product)
-
-
-    # In deze for loop kijkt die als er meer dan 4 producten in een categorie zijn gekocht
-    # dat hij er maximaal 4 van maakt
-    for profile in result_dict:
-        for category in result_dict[profile]:
-            if len(result_dict[profile][category]) > 4:
-                result_dict[profile][category] = result_dict[profile][category][:4]
-
-
-
-    # In deze for loop kijkt hij of er 4 producten per categorie worden aanbevolen en anders voegt hij die toe
-    for profile in tqdm(result_dict):
-        for category in top_4_products_per_category:
-            if category not in result_dict[profile]:
-                result_dict[profile][category] = []
-
-            # Als er nog niet genoeg producten in de categorie zit voegt die producten
-            # Vanuit de dictionary met alle producten per categorie
-            if len(result_dict[profile][category]) < 4:
-                for product_id in aanbeveling.get(category, []):
-                    if len(result_dict[profile][category]) >= 4:
-                        break
-                    if product_id not in result_dict[profile][category]:
-                        result_dict[profile][category].append(product_id)
-
-    # Print statement voor duidelijkheid
-    print("Data voorbereiden voor database...")
-
-    # Hier voeg ik elk profiel en de bijborende producten toe aan de database
     to_execute = []
-    for profile_id, categories in tqdm(result_dict.items()):
-        for category, products in categories.items():
-            for product in products:
-                to_execute.append((profile_id, product, category))
 
-
-    # Hier voeg ik het toe als de gebruiker geen profiel heeft
-
+    # Voor elke categorie voegt die de producten toe
     for category, products in top_4_products_per_category.items():
-        profile_id = None
-        for product in products:
-            to_execute.append((profile_id, product, category))
+        for product_id in products:
+            to_execute.append(product_id, category)
 
-    # SQL query voor het toevoegen
-    query = "INSERT INTO meest_gekocht (profileid, productid, category) VALUES %s"
+    # SQL query voor naar de database schrijven
+    query = "INSERT INTO populaire_producten (productid, category) VALUES %s"
 
     to_execute = tuple(to_execute)
 
-    # Print statement voor duidelijkheid
-    print(f"{len(to_execute)} aanbeveling_categorie tabellen maken...")
     psycopg2.extras.execute_values(cursor, query, to_execute)
+
+
