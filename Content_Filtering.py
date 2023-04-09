@@ -3,6 +3,8 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 import os
 
+load_dotenv()
+
 conn = psycopg2.connect(
     database=os.getenv("postgres_DB"),
     host='localhost',
